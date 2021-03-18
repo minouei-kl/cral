@@ -37,6 +37,7 @@ new_pipe.set_algo(
 
 new_pipe.train(
     num_epochs=8,
+    batch_size=16,
     snapshot_prefix='deeplab',
     snapshot_path='./tmp/',
     snapshot_every_n=1
