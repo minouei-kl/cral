@@ -1,3 +1,3 @@
 pip install git+https://github.com/lucasb-eyer/pydensecrf.git
-pip install git+https://github.com/segmind/cral
+pip install git+https://github.com/minouei-kl/cral
 python run.py

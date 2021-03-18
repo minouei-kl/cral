@@ -51,15 +51,15 @@ class SemanticSegPipe(PipelineBase):
             img_to_anno (function, optional): Function to convert image name
                 to annotation name
         """
-        self.dataset_hash, self.dataset_csv_path, self.dataset_json = segmentation_dataset_hasher(  # noqa: E501
-            annotation_format=annotation_format,
-            train_images_dir=train_images_dir,
-            train_anno_dir=train_anno_dir,
-            val_images_dir=val_images_dir,
-            val_anno_dir=val_anno_dir,
-            # names_file=names_file,
-            split=split,
-            img_to_anno=img_to_anno)
+        # self.dataset_hash, self.dataset_csv_path, self.dataset_json = segmentation_dataset_hasher(  # noqa: E501
+        #     annotation_format=annotation_format,
+        #     train_images_dir=train_images_dir,
+        #     train_anno_dir=train_anno_dir,
+        #     val_images_dir=val_images_dir,
+        #     val_anno_dir=val_anno_dir,
+        #     # names_file=names_file,
+        #     split=split,
+        #     img_to_anno=img_to_anno)
 
         # No need to save because it is empty
         # with open(self.dataset_json) as f:
@@ -74,8 +74,8 @@ class SemanticSegPipe(PipelineBase):
             val_anno_dir=val_anno_dir)
 
         # rewrite because the above returns only path where to write json
-        with open(self.dataset_json, 'w') as json_file:
-            json_file.write(json.dumps(self.data_dict, indent=2))
+        # with open(self.dataset_json, 'w') as json_file:
+        #     json_file.write(json.dumps(self.data_dict, indent=2))
 
         # print(self.data_dict)
         self.update_project_file(self.data_dict)
@@ -83,9 +83,14 @@ class SemanticSegPipe(PipelineBase):
 
     def lock_data(self):
         """Parse Data and makes tf-records and creates meta-data."""
-        meta_info = create_tfrecords_semantic_segmentation(
-            self.data_dict, self.dataset_csv_path)
-
+        # meta_info = create_tfrecords_semantic_segmentation(
+        #     self.data_dict, self.dataset_csv_path)
+        meta_info = {'train_images_dir': '/netscratch/minouei/versicherung/version2/images/train', 
+                     'train_anno_dir': '/netscratch/minouei/versicherung/version2/annotations/train',
+                     'val_images_dir': '/netscratch/minouei/versicherung/version2/images/train', 
+                     'val_anno_dir': '/netscratch/minouei/versicherung/version2/annotations/train',
+                     'num_training_images': 39953, 'num_test_images': 40, 
+                     'tfrecord_path': '/netscratch/minouei/versicherung/version2/records', 'num_classes': 15}
         self.update_project_file(meta_info)
 
     def set_aug(self):
@@ -303,6 +308,9 @@ class SemanticSegPipe(PipelineBase):
                 test_input_function = None
                 validation_steps = None
 
+            if distribute_strategy is not None:
+                train_dist_dataset = distribute_strategy.experimental_distribute_dataset(train_input_function)
+
 
         else:
             raise ValueError('argument to `config` is not understood.')
@@ -326,7 +334,7 @@ class SemanticSegPipe(PipelineBase):
         self.model.cral_file = cral_asset_file
 
         self.model.fit(
-            x=train_input_function,
+            x=train_dist_dataset,
             epochs=num_epochs,
             callbacks=callbacks,
             steps_per_epoch=steps_per_epoch,
