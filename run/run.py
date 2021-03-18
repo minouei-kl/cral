@@ -1,5 +1,6 @@
 from cral.pipeline.semantic_segmentation_pipeline import SemanticSegPipe
 import os
+import tensorflow as tf
 
 new_pipe = SemanticSegPipe()
 
