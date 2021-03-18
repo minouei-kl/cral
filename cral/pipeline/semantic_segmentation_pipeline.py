@@ -342,8 +342,20 @@ class SemanticSegPipe(PipelineBase):
             validation_steps=validation_steps,
             validation_freq=validate_every_n)
 
+
+
         final_model_path = os.path.join(snapshot_path,
                                         str(snapshot_prefix) + '_final')
+
+        task_type, task_id = (distribute_strategy.cluster_resolver.task_type,
+                              distribute_strategy.cluster_resolver.task_id)
+
+        if task_type is None or task_type == 'chief' or (
+            task_type == 'worker' and task_id == 0):
+            final_model_path = final_model_path
+        else:
+            final_model_path = os.path.join('/tmp', task_type, str(task_id))
+            tf.io.gfile.makedirs(final_model_path)
 
         self.model.save(filepath=final_model_path, overwrite=True)
 
