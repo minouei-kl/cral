@@ -41,5 +41,5 @@ new_pipe.train(
     batch_size=16,
     snapshot_prefix='deeplab',
     snapshot_path='./tmp/',
-    snapshot_every_n=1
+    snapshot_every_n=1,distribute_strategy=mirrored_strategy
     )
