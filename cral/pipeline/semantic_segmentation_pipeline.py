@@ -112,68 +112,69 @@ class SemanticSegPipe(PipelineBase):
 
         feature_extractor = feature_extractor.lower()
 
-        if isinstance(config, Deeplabv3Config):
-            from cral.models.semantic_segmentation import (
-                create_DeepLabv3Plus, log_deeplabv3_config_params)
+        with distribute_strategy.scope():
+            if isinstance(config, Deeplabv3Config):
+                from cral.models.semantic_segmentation import (
+                    create_DeepLabv3Plus, log_deeplabv3_config_params)
 
-            assert isinstance(
-                config,
-                Deeplabv3Config), 'please provide a `Deeplabv3Config()` object'
+                assert isinstance(
+                    config,
+                    Deeplabv3Config), 'please provide a `Deeplabv3Config()` object'
 
-            if feature_extractor == 'mobilenetv2':  # hardcoded for now
-                config.height = 224
-                config.width = 224
-                config.input_shape = (224, 224, 3)
+                if feature_extractor == 'mobilenetv2':  # hardcoded for now
+                    config.height = 224
+                    config.width = 224
+                    config.input_shape = (224, 224, 3)
 
-            log_deeplabv3_config_params(config)
+                log_deeplabv3_config_params(config)
 
-            if weights in ('imagenet', None):
-                self.model, self.preprocessing_fn = create_DeepLabv3Plus(
-                    feature_extractor, config, num_classes, weights,
-                    base_trainable)
-            elif tf.saved_model.contains_saved_model(weights):
-                print('\nLoading Weights\n')
-                old_config = None
-                old_extractor = None
-                old_cral_path = os.path.join(weights, 'assets', 'segmind.cral')
-                if os.path.isfile(old_cral_path):
-                    with open(old_cral_path) as old_cral_file:
-                        dic = json.load(old_cral_file)
+                if weights in ('imagenet', None):
+                    self.model, self.preprocessing_fn = create_DeepLabv3Plus(
+                        feature_extractor, config, num_classes, weights,
+                        base_trainable)
+                elif tf.saved_model.contains_saved_model(weights):
+                    print('\nLoading Weights\n')
+                    old_config = None
+                    old_extractor = None
+                    old_cral_path = os.path.join(weights, 'assets', 'segmind.cral')
+                    if os.path.isfile(old_cral_path):
+                        with open(old_cral_path) as old_cral_file:
+                            dic = json.load(old_cral_file)
 
-                        if 'semanic_segmentation_meta' in dic.keys():
-                            if 'config' in dic[
-                                    'semanic_segmentation_meta'].keys():
-                                old_config = jsonpickle.decode(
-                                    dic['semanic_segmentation_meta']['config'])
-                            if 'feature_extractor' in dic[
-                                    'semanic_segmentation_meta'].keys():
-                                old_extractor = dic[
-                                    'semanic_segmentation_meta'][
-                                        'feature_extractor']
+                            if 'semanic_segmentation_meta' in dic.keys():
+                                if 'config' in dic[
+                                        'semanic_segmentation_meta'].keys():
+                                    old_config = jsonpickle.decode(
+                                        dic['semanic_segmentation_meta']['config'])
+                                if 'feature_extractor' in dic[
+                                        'semanic_segmentation_meta'].keys():
+                                    old_extractor = dic[
+                                        'semanic_segmentation_meta'][
+                                            'feature_extractor']
 
-                if None in (old_extractor, old_config):
+                    if None in (old_extractor, old_config):
+                        assert False, 'Weights file is not supported'
+                    elif feature_extractor != old_extractor:
+                        assert False, f'feature_extractor mismatch {feature_extractor}!={old_extractor}'  # noqa: E501
+                    # elif not (config.check_equality(old_config)):
+                    elif vars(config) != vars(old_config):
+                        assert False, 'Weights could not be loaded'
+
+                    self.model, self.preprocessing_fn = create_DeepLabv3Plus(
+                        feature_extractor, config, num_classes, None,
+                        base_trainable)
+
+                    self.model.load_weights(
+                        os.path.join(weights, 'variables', 'variables'))
+                else:
                     assert False, 'Weights file is not supported'
-                elif feature_extractor != old_extractor:
-                    assert False, f'feature_extractor mismatch {feature_extractor}!={old_extractor}'  # noqa: E501
-                # elif not (config.check_equality(old_config)):
-                elif vars(config) != vars(old_config):
-                    assert False, 'Weights could not be loaded'
 
-                self.model, self.preprocessing_fn = create_DeepLabv3Plus(
-                    feature_extractor, config, num_classes, None,
-                    base_trainable)
+                # deeplabv3 default losses
+                loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
+                architecture = 'deeplabv3plus'
 
-                self.model.load_weights(
-                    os.path.join(weights, 'variables', 'variables'))
             else:
-                assert False, 'Weights file is not supported'
-
-            # deeplabv3 default losses
-            loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-            architecture = 'deeplabv3plus'
-
-        else:
-            raise ValueError('argument to `config` is not understood.')
+                raise ValueError('argument to `config` is not understood.')
 
         # custom image normalizing function
         if preprocessing_fn is not None:
@@ -188,24 +189,16 @@ class SemanticSegPipe(PipelineBase):
             return input_batch
 
         # Attach function to Model
-        self.model.preprocess = _preprocess
+        with distribute_strategy.scope():
+            self.model.preprocess = _preprocess
 
-        # Model parallelism
-        if distribute_strategy is None:
             self.model.compile(
                 loss=loss,
                 optimizer=optimizer,
-                metrics=['accuracy',
-                         SparseMeanIoU(num_classes=num_classes)])
-        else:
-            with distribute_strategy.scope():
-                self.model.compile(
-                    loss=loss,
-                    optimizer=optimizer,
-                    metrics=[
-                        'accuracy',
-                        SparseMeanIoU(num_classes=num_classes)
-                    ])
+                metrics=[
+                    'accuracy',
+                    SparseMeanIoU(num_classes=num_classes)
+                ])
 
         algo_meta = dict(
             feature_extractor=feature_extractor,
