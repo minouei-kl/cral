@@ -26,7 +26,7 @@ slurm_resolver = tf.distribute.cluster_resolver.SlurmClusterResolver(port_base=1
 mirrored_strategy = tf.distribute.MultiWorkerMirroredStrategy(cluster_resolver=slurm_resolver)
 
 new_pipe.set_algo(
-    feature_extractor='xception',base_trainable=True,
+    feature_extractor='resnet50',base_trainable=True,
     config=deeplab_config,distribute_strategy=mirrored_strategy
 )
 
@@ -38,7 +38,7 @@ new_pipe.set_algo(
 
 new_pipe.train(
     num_epochs=8,
-    batch_size=12,
+    batch_size=8,
     snapshot_prefix='deeplab',
     snapshot_path='./tmp/',
     snapshot_every_n=1,distribute_strategy=mirrored_strategy
