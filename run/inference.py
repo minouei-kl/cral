@@ -3,7 +3,7 @@ from cral.pipeline.semantic_segmentation_pipeline import SemanticSegPipe
 from IPython.display import display
 
 new_pipe = SemanticSegPipe()
-new_pipe.dcrf = True #enable or disable dcrf
+new_pipe.dcrf = False #enable or disable dcrf
 
 pred_func = new_pipe.prediction_model('./tmp/deeplab_final/')
 # pred_func = new_pipe.prediction_model('./outm/')
